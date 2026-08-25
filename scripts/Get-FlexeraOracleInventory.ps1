@@ -1,11 +1,11 @@
 [CmdletBinding(DefaultParameterSetName = 'Api')]
 param(
-    [Parameter(Mandatory, ParameterSetName = 'Api')]
+    [Parameter(ParameterSetName = 'Api')]
     [string] $OrganizationId,
 
     [Parameter(ParameterSetName = 'Api')]
     [ValidateSet('NAM', 'EU', 'APAC')]
-    [string] $Zone = $(if ($env:FLEXERA_ZONE) { $env:FLEXERA_ZONE } else { 'EU' }),
+    [string] $Zone = 'EU',
 
     [Parameter(ParameterSetName = 'Api')]
     [uri] $BaseUri,
@@ -45,11 +45,110 @@ param(
 
     [char] $Delimiter = ',',
 
-    [switch] $OnlyOptions
+    [switch] $OnlyOptions,
+
+    [string] $ConfigFile
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+# Charge automatiquement la configuration privée du dépôt avant de résoudre les
+# paramètres dépendants de l'environnement. Les paramètres passés explicitement
+# en ligne de commande restent toujours prioritaires sur la configuration.
+$repositoryRoot = Split-Path -Parent $PSScriptRoot
+$defaultConfigFile = Join-Path $repositoryRoot 'config/flexera.env.ps1'
+$configWasExplicit = $PSBoundParameters.ContainsKey('ConfigFile') -or
+    -not [string]::IsNullOrWhiteSpace([string] $env:FLEXERA_CONFIG_FILE)
+$configPath = if ($PSBoundParameters.ContainsKey('ConfigFile')) {
+    $ConfigFile
+}
+elseif (-not [string]::IsNullOrWhiteSpace([string] $env:FLEXERA_CONFIG_FILE)) {
+    [string] $env:FLEXERA_CONFIG_FILE
+}
+else {
+    $defaultConfigFile
+}
+
+if (-not [string]::IsNullOrWhiteSpace([string] $configPath)) {
+    if (Test-Path -LiteralPath $configPath -PathType Leaf) {
+        . (Resolve-Path -LiteralPath $configPath).Path
+        Write-Verbose "Configuration Flexera chargée depuis '$configPath'."
+    }
+    elseif ($configWasExplicit) {
+        throw "Fichier de configuration Flexera introuvable : '$configPath'."
+    }
+    else {
+        Write-Verbose "Aucun fichier config/flexera.env.ps1 trouvé ; utilisation des paramètres et variables déjà présents."
+    }
+}
+
+function Get-EnvironmentInt {
+    param(
+        [Parameter(Mandatory)][string] $Name,
+        [Parameter(Mandatory)][int] $CurrentValue,
+        [Parameter(Mandatory)][int] $Minimum,
+        [Parameter(Mandatory)][int] $Maximum
+    )
+
+    $raw = [Environment]::GetEnvironmentVariable($Name)
+    if ([string]::IsNullOrWhiteSpace($raw)) { return $CurrentValue }
+
+    $parsed = 0
+    if (-not [int]::TryParse($raw, [ref] $parsed) -or $parsed -lt $Minimum -or $parsed -gt $Maximum) {
+        throw "$Name doit être un entier compris entre $Minimum et $Maximum. Valeur reçue : '$raw'."
+    }
+    return $parsed
+}
+
+if (-not $PSBoundParameters.ContainsKey('OrganizationId') -and $env:FLEXERA_ORG_ID) {
+    $OrganizationId = [string] $env:FLEXERA_ORG_ID
+}
+if (-not $PSBoundParameters.ContainsKey('Zone') -and $env:FLEXERA_ZONE) {
+    $Zone = [string] $env:FLEXERA_ZONE
+}
+if (-not $PSBoundParameters.ContainsKey('BaseUri') -and $env:FLEXERA_API_BASE_URL) {
+    $BaseUri = [uri] $env:FLEXERA_API_BASE_URL
+}
+if (-not $PSBoundParameters.ContainsKey('ReportId') -and $env:FLEXERA_ORACLE_REPORT_ID) {
+    $ReportId = [string] $env:FLEXERA_ORACLE_REPORT_ID
+}
+if (-not $PSBoundParameters.ContainsKey('ReportName') -and $env:FLEXERA_ORACLE_REPORT_NAME) {
+    $ReportName = [string] $env:FLEXERA_ORACLE_REPORT_NAME
+}
+if (-not $PSBoundParameters.ContainsKey('PageSize')) {
+    $PageSize = Get-EnvironmentInt -Name 'FLEXERA_ORACLE_PAGE_SIZE' -CurrentValue $PageSize -Minimum 1 -Maximum 10000
+}
+if (-not $PSBoundParameters.ContainsKey('PollTimeoutSeconds')) {
+    $PollTimeoutSeconds = Get-EnvironmentInt -Name 'FLEXERA_ORACLE_POLL_TIMEOUT_SECONDS' -CurrentValue $PollTimeoutSeconds -Minimum 1 -Maximum 3600
+}
+if (-not $PSBoundParameters.ContainsKey('PollIntervalSeconds')) {
+    $PollIntervalSeconds = Get-EnvironmentInt -Name 'FLEXERA_ORACLE_POLL_INTERVAL_SECONDS' -CurrentValue $PollIntervalSeconds -Minimum 1 -Maximum 300
+}
+if (-not $PSBoundParameters.ContainsKey('SearchText') -and $env:FLEXERA_ORACLE_SEARCH_TEXT) {
+    $SearchText = [string] $env:FLEXERA_ORACLE_SEARCH_TEXT
+}
+if (-not $PSBoundParameters.ContainsKey('RawReportCsv') -and $env:FLEXERA_ORACLE_RAW_REPORT_CSV) {
+    $RawReportCsv = [string] $env:FLEXERA_ORACLE_RAW_REPORT_CSV
+}
+if (-not $PSBoundParameters.ContainsKey('Delimiter') -and $env:FLEXERA_CSV_DELIMITER) {
+    $delimiterText = [string] $env:FLEXERA_CSV_DELIMITER
+    if ($delimiterText.Length -ne 1) { throw 'FLEXERA_CSV_DELIMITER doit contenir exactement un caractère.' }
+    $Delimiter = [char] $delimiterText[0]
+}
+if (-not $PSBoundParameters.ContainsKey('OutputCsv')) {
+    if ($env:FLEXERA_ORACLE_OUTPUT_CSV) {
+        $OutputCsv = [string] $env:FLEXERA_ORACLE_OUTPUT_CSV
+    }
+    else {
+        $reportDirectory = if ($env:FLEXERA_REPORT_DIR) { [string] $env:FLEXERA_REPORT_DIR } else { 'reports' }
+        $OutputCsv = Join-Path $reportDirectory ("oracle-options-{0}.csv" -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
+    }
+}
+
+if ($PSCmdlet.ParameterSetName -eq 'Api' -and [string]::IsNullOrWhiteSpace([string] $OrganizationId)) {
+    throw 'OrganizationId est requis en mode API. Définissez FLEXERA_ORG_ID dans config/flexera.env.ps1 ou utilisez -OrganizationId.'
+}
 
 function Get-FlexeraZoneConfig {
     param([Parameter(Mandatory)][string] $ZoneName)
