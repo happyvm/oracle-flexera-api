@@ -1,3 +1,4 @@
 exports/
 reports/
 config/column-map.json
+config/flexera.env.ps1

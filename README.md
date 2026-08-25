@@ -78,7 +78,48 @@ argument ou écrits dans les rapports.
 
 ## 1. Configuration initiale de l'exécution autonome
 
-Enregistrer les variables au niveau du compte qui exécutera la tâche :
+### Zone du tenant Flexera (EU ou US)
+
+Flexera One sépare ses tenants par zone géographique, avec des URL d'API et
+d'authentification différentes. La zone se déduit du portail utilisé pour se
+connecter :
+
+| | Amérique du Nord (US) | Europe (EU) |
+| --- | --- | --- |
+| Portail | `app.flexera.com` | `app.flexera.eu` |
+| API base | `api.flexera.com` | `api.flexera.eu` |
+| Jeton OAuth | `https://login.flexera.com/oidc/token` | `https://login.flexera.eu/oidc/token` |
+
+Le script utilise `https://login.flexera.com/oidc/token` par défaut si
+`FLEXERA_TOKEN_URL` n'est pas défini : les tenants EU doivent donc **toujours**
+renseigner explicitement `FLEXERA_TOKEN_URL` (et utiliser `api.flexera.eu` dans
+`FLEXERA_LICENSE_API_URL`), sous peine d'authentification contre le mauvais
+pays et d'échec `401`.
+
+### Variables d'environnement
+
+Copier [`config/flexera.env.example.ps1`](config/flexera.env.example.ps1) vers
+`config/flexera.env.ps1` (fichier ignoré par git, jamais committé), renseigner
+les valeurs, puis le charger dans la session avant chaque exécution :
+
+```powershell
+. .\config\flexera.env.ps1
+.\scripts\Invoke-OracleLicenseControl.ps1
+```
+
+Le fichier modèle couvre toutes les variables reconnues par le script :
+
+| Variable | Obligatoire | Rôle |
+| --- | --- | --- |
+| `FLEXERA_CLIENT_ID` | oui | Identifiant du compte de service OAuth Flexera. |
+| `FLEXERA_CLIENT_SECRET` | oui | Secret associé, jamais passé en argument. |
+| `FLEXERA_LICENSE_API_URL` | oui (mode API) | URL de l'endpoint ITAM des positions de licences. |
+| `FLEXERA_TOKEN_URL` | recommandé (obligatoire en EU) | URL du endpoint OAuth token. Défaut : `https://login.flexera.com/oidc/token`. |
+| `FLEXERA_AUDIENCE` | non | Audience OAuth, si imposée par l'admin Flexera. |
+| `FLEXERA_SCOPE` | non | Scope OAuth, si imposé par l'admin Flexera. |
+
+Alternative sans fichier de config, en définissant les variables directement
+dans la session :
 
 ```powershell
 $env:FLEXERA_CLIENT_ID = '...'
@@ -91,7 +132,6 @@ $env:FLEXERA_AUDIENCE = 'audience-fournie-par-flexera'
 $env:FLEXERA_SCOPE = 'scope-fourni-par-flexera'
 ```
 
-`FLEXERA_TOKEN_URL` utilise `https://login.flexera.com/oidc/token` par défaut.
 Le secret doit être stocké dans le gestionnaire de secrets de l'ordonnanceur en
 production, puis injecté dans l'environnement du processus.
 
