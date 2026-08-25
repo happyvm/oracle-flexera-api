@@ -23,6 +23,75 @@ GET  /fnms/v1/orgs/{orgId}/reports/{id}/execute-async/{jobId}/retrieve
 
 Le script cherche automatiquement le rapport par son nom. `-ReportId` permet de forcer l'identifiant si plusieurs rapports ont le même nom.
 
+## Configuration centralisée
+
+Copier le modèle :
+
+```powershell
+Copy-Item .\config\flexera.env.example.ps1 .\config\flexera.env.ps1
+```
+
+Puis renseigner au minimum :
+
+```powershell
+$env:FLEXERA_REFRESH_TOKEN = '...'
+$env:FLEXERA_ZONE = 'EU'
+$env:FLEXERA_ORG_ID = '12345'
+```
+
+`config/flexera.env.ps1` est ignoré par Git. `Get-FlexeraOracleInventory.ps1` le charge automatiquement à chaque exécution. Une fois le fichier renseigné, le lancement nominal devient donc :
+
+```powershell
+.\scripts\Get-FlexeraOracleInventory.ps1
+```
+
+Pour ne sortir que les options/packs effectivement listés par Flexera :
+
+```powershell
+.\scripts\Get-FlexeraOracleInventory.ps1 -OnlyOptions
+```
+
+Les paramètres passés en ligne de commande ont toujours priorité sur le fichier de configuration. Exemple :
+
+```powershell
+.\scripts\Get-FlexeraOracleInventory.ps1 -PageSize 2000 -OnlyOptions
+```
+
+Un fichier de configuration différent peut être utilisé ponctuellement :
+
+```powershell
+.\scripts\Get-FlexeraOracleInventory.ps1 -ConfigFile C:\secure\flexera.env.ps1
+```
+
+ou globalement :
+
+```powershell
+$env:FLEXERA_CONFIG_FILE = 'C:\secure\flexera.env.ps1'
+```
+
+### Variables reconnues pour le Worksheet
+
+| Variable | Rôle |
+| --- | --- |
+| `FLEXERA_REFRESH_TOKEN` | API Refresh Token utilisateur. |
+| `FLEXERA_CLIENT_ID` / `FLEXERA_CLIENT_SECRET` | Alternative service account. |
+| `FLEXERA_ZONE` | `EU`, `NAM` ou `APAC`. |
+| `FLEXERA_ORG_ID` | Organization ID Flexera One. |
+| `FLEXERA_API_BASE_URL` | Override de l'URL API. |
+| `FLEXERA_TOKEN_URL` | Override de l'endpoint OAuth. |
+| `FLEXERA_ORACLE_REPORT_NAME` | Nom du rapport à découvrir. |
+| `FLEXERA_ORACLE_REPORT_ID` | ID du rapport, facultatif. |
+| `FLEXERA_ORACLE_PAGE_SIZE` | Taille des pages synchrones. |
+| `FLEXERA_ORACLE_POLL_TIMEOUT_SECONDS` | Timeout du mode asynchrone. |
+| `FLEXERA_ORACLE_POLL_INTERVAL_SECONDS` | Intervalle de polling asynchrone. |
+| `FLEXERA_ORACLE_SEARCH_TEXT` | Filtre `searchText`, facultatif. |
+| `FLEXERA_REPORT_DIR` | Répertoire des CSV datés par défaut. |
+| `FLEXERA_ORACLE_OUTPUT_CSV` | Chemin de sortie fixe, facultatif. |
+| `FLEXERA_ORACLE_RAW_REPORT_CSV` | Export brut du Worksheet, facultatif. |
+| `FLEXERA_CSV_DELIMITER` | Séparateur CSV. |
+
+`-OnlyOptions`, `-Async` et `-Verbose` restent volontairement des choix d'exécution en ligne de commande.
+
 ## Authentification
 
 Flexera One supporte deux modes, tous les deux transformés en `access_token` Bearer avant l'appel ITAM.
@@ -57,15 +126,6 @@ Le script utilise alors `grant_type=client_credentials`.
 
 ### Zone
 
-La zone sélectionne automatiquement les bons domaines API et OAuth :
-
-```powershell
-# Europe — valeur par défaut
-$env:FLEXERA_ZONE = 'EU'
-
-# Autres valeurs possibles : NAM, APAC
-```
-
 Correspondance :
 
 | Zone | API | OAuth |
@@ -74,47 +134,23 @@ Correspondance :
 | `EU` | `https://api.flexera.eu` | `https://login.flexera.eu/oidc/token` |
 | `APAC` | `https://api.flexera.au` | `https://login.flexera.au/oidc/token` |
 
-Une URL de token personnalisée peut toujours être imposée avec `FLEXERA_TOKEN_URL`.
+> Ne jamais stocker le vrai refresh token dans Git. Utiliser `config/flexera.env.ps1` ou un gestionnaire de secrets.
 
-> Ne jamais stocker le vrai refresh token dans Git. Utiliser `config/flexera.env.ps1` (ignoré par `.gitignore`) ou un gestionnaire de secrets.
+## Exécution avancée
 
-## Exécution
+Le mode synchrone est utilisé par défaut et suit la pagination `skipToken`.
 
-Avec un compte utilisateur EU :
+Pour demander l'exécution asynchrone :
 
 ```powershell
-$env:FLEXERA_REFRESH_TOKEN = '...'
-
-.\scripts\Get-FlexeraOracleInventory.ps1 `
-  -OrganizationId '12345' `
-  -Zone EU `
-  -OnlyOptions `
-  -OutputCsv .\reports\oracle-options.csv
+.\scripts\Get-FlexeraOracleInventory.ps1 -Async
 ```
 
-Le mode synchrone est utilisé par défaut et suit la pagination `skipToken`. La taille de page est configurable :
+Pour conserver la réponse tabulaire brute avant éclatement des options :
 
 ```powershell
 .\scripts\Get-FlexeraOracleInventory.ps1 `
-  -OrganizationId '12345' `
-  -PageSize 2000
-```
-
-Pour demander l'exécution asynchrone du rapport :
-
-```powershell
-.\scripts\Get-FlexeraOracleInventory.ps1 `
-  -OrganizationId '12345' `
-  -Async
-```
-
-Pour conserver en plus la réponse tabulaire brute du rapport avant éclatement des options :
-
-```powershell
-.\scripts\Get-FlexeraOracleInventory.ps1 `
-  -OrganizationId '12345' `
-  -RawReportCsv .\reports\oracle-server-worksheet-raw.csv `
-  -OutputCsv .\reports\oracle-options.csv
+  -RawReportCsv .\reports\oracle-server-worksheet-raw.csv
 ```
 
 ## Sortie
