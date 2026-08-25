@@ -17,7 +17,14 @@ param(
     [string] $ReportName = 'Oracle Server Worksheet for Oracle Database',
 
     [Parameter(ParameterSetName = 'Api')]
-    [switch] $Synchronous,
+    [switch] $Async,
+
+    [Parameter(ParameterSetName = 'Api')]
+    [ValidateRange(1, 10000)]
+    [int] $PageSize = 1000,
+
+    [Parameter(ParameterSetName = 'Api')]
+    [string] $SearchText,
 
     [Parameter(ParameterSetName = 'Api')]
     [ValidateRange(1, 3600)]
@@ -114,12 +121,12 @@ function Get-CollectionFromResponse {
 
     if ($Response -is [array]) { return @($Response) }
 
-    foreach ($property in 'rows', 'records', 'items', 'results', 'data', 'value') {
+    foreach ($property in 'rows', 'records', 'items', 'results', 'values', 'data', 'value') {
         if ($Response.PSObject.Properties.Name -contains $property) {
             $value = $Response.$property
             if ($value -is [array]) { return @($value) }
             if ($null -ne $value -and $value -isnot [string]) {
-                foreach ($nestedProperty in 'rows', 'records', 'items', 'results', 'data', 'value') {
+                foreach ($nestedProperty in 'rows', 'records', 'items', 'results', 'values', 'data', 'value') {
                     if ($value.PSObject.Properties.Name -contains $nestedProperty) {
                         return @(Get-CollectionFromResponse -Response $value)
                     }
@@ -134,7 +141,7 @@ function Get-CollectionFromResponse {
 function Get-NextPageUri {
     param([Parameter(Mandatory)] $Response)
 
-    foreach ($property in 'next', 'nextLink', 'next_page') {
+    foreach ($property in 'nextPage', 'next', 'nextLink', 'next_page') {
         $value = Get-PropertyValue -Object $Response -Candidates @($property)
         if ($value) { return [string] $value }
     }
@@ -142,7 +149,7 @@ function Get-NextPageUri {
     foreach ($containerName in 'links', 'pagination', 'meta') {
         $container = Get-PropertyValue -Object $Response -Candidates @($containerName)
         if ($container) {
-            $next = Get-PropertyValue -Object $container -Candidates @('next', 'nextLink', 'next_page')
+            $next = Get-PropertyValue -Object $container -Candidates @('nextPage', 'next', 'nextLink', 'next_page')
             if ($next) { return [string] $next }
         }
     }
@@ -208,6 +215,60 @@ function Resolve-FlexeraReportId {
         throw "Le rapport '$RequestedName' ne contient pas d'identifiant exploitable."
     }
     return [string] $id
+}
+
+function Invoke-FlexeraReportSync {
+    param(
+        [Parameter(Mandatory)][uri] $ReportBaseUri,
+        [Parameter(Mandatory)][hashtable] $Headers,
+        [Parameter(Mandatory)][int] $Limit,
+        [string] $FilterText
+    )
+
+    $executeUri = "$($ReportBaseUri.AbsoluteUri.TrimEnd('/'))/execute"
+    $origin = $ReportBaseUri.Host
+    $rows = [Collections.Generic.List[object]]::new()
+    $skipToken = $null
+    $nextPage = $null
+
+    for ($page = 1; $page -le 1000; $page++) {
+        if ($nextPage) {
+            $requestUri = [uri]::new([uri] $executeUri, $nextPage)
+            if ($requestUri.Scheme -ne 'https' -or $requestUri.Host -ne $origin) {
+                throw "La pagination du rapport a retourné une URL non sûre : $requestUri"
+            }
+        }
+        else {
+            $query = "limit=$Limit"
+            if (-not [string]::IsNullOrWhiteSpace($FilterText)) {
+                $query += "&searchText=$([uri]::EscapeDataString($FilterText))"
+            }
+            if (-not [string]::IsNullOrWhiteSpace([string] $skipToken)) {
+                $query += "&skipToken=$([uri]::EscapeDataString([string] $skipToken))"
+            }
+            $requestUri = [uri] "$executeUri`?$query"
+        }
+
+        $response = Invoke-RestMethod -Method Get -Uri $requestUri -Headers $Headers
+        foreach ($row in (Get-CollectionFromResponse -Response $response)) { $rows.Add($row) }
+
+        $nextPage = Get-NextPageUri -Response $response
+        if ($nextPage) { continue }
+
+        $skipToken = Get-PropertyValue -Object $response -Candidates @('skipToken', 'nextSkipToken', 'next_skip_token')
+        if (-not $skipToken) {
+            foreach ($containerName in 'pagination', 'meta') {
+                $container = Get-PropertyValue -Object $response -Candidates @($containerName)
+                if ($container) {
+                    $skipToken = Get-PropertyValue -Object $container -Candidates @('skipToken', 'nextSkipToken', 'next_skip_token')
+                    if ($skipToken) { break }
+                }
+            }
+        }
+        if (-not $skipToken) { return $rows.ToArray() }
+    }
+
+    throw 'Pagination du rapport interrompue après 1 000 pages.'
 }
 
 function Invoke-FlexeraReportAsync {
@@ -298,14 +359,14 @@ if ($PSCmdlet.ParameterSetName -eq 'Api') {
     }
 
     $reportBaseUri = [uri] "$($reportsUri.AbsoluteUri.TrimEnd('/'))/$([uri]::EscapeDataString($resolvedReportId))"
-    $response = if ($Synchronous) {
-        Invoke-RestMethod -Method Get -Uri "$($reportBaseUri.AbsoluteUri)/execute" -Headers $headers
+    $sourceRows = if ($Async) {
+        $response = Invoke-FlexeraReportAsync -ReportBaseUri $reportBaseUri -Headers $headers -TimeoutSeconds $PollTimeoutSeconds -IntervalSeconds $PollIntervalSeconds
+        @(Get-CollectionFromResponse -Response $response)
     }
     else {
-        Invoke-FlexeraReportAsync -ReportBaseUri $reportBaseUri -Headers $headers -TimeoutSeconds $PollTimeoutSeconds -IntervalSeconds $PollIntervalSeconds
+        @(Invoke-FlexeraReportSync -ReportBaseUri $reportBaseUri -Headers $headers -Limit $PageSize -FilterText $SearchText)
     }
 
-    $sourceRows = @(Get-CollectionFromResponse -Response $response)
     if ($RawReportCsv) {
         $rawDirectory = Split-Path -Parent $RawReportCsv
         if ($rawDirectory) { New-Item -ItemType Directory -Path $rawDirectory -Force | Out-Null }
@@ -322,11 +383,11 @@ $sample = $sourceRows[0]
 $columns = [pscustomobject]@{
     PhysicalServer = Resolve-SourceColumn $sample 'Physical server name' @('Physical server name', 'PhysicalServerName', 'Physical Server', 'Host server name') -Optional
     VirtualServer  = Resolve-SourceColumn $sample 'Virtual server name' @('Virtual server name', 'VirtualServerName', 'Virtual Server', 'Device name') -Optional
-    Instance       = Resolve-SourceColumn $sample 'Instance name' @('Instance name', 'InstanceName', 'Oracle instance', 'OracleInstanceName')
+    Instance       = Resolve-SourceColumn $sample 'DB instance name' @('DB instance name', 'Instance name', 'InstanceName', 'Oracle instance', 'OracleInstanceName')
     Version        = Resolve-SourceColumn $sample 'Product version' @('Product version', 'ProductVersion', 'Version') -Optional
     Edition        = Resolve-SourceColumn $sample 'Product edition' @('Product edition', 'ProductEdition', 'Edition') -Optional
     Environment    = Resolve-SourceColumn $sample 'Environment usage' @('Environment usage', 'EnvironmentUsage', 'Environment') -Optional
-    Metric         = Resolve-SourceColumn $sample 'License metric' @('License metric', 'LicenseMetric', 'Metric') -Optional
+    Metric         = Resolve-SourceColumn $sample 'License metric (NUP/Processor)' @('License metric (NUP/Processor)', 'License metric', 'LicenseMetric', 'Metric') -Optional
     Consumption    = Resolve-SourceColumn $sample 'Number of licenses in use' @('Number of licenses in use', 'NumberOfLicensesInUse', 'Licenses in use', 'Consumption') -Optional
     Options        = Resolve-SourceColumn $sample 'Options & Mgmt packs in use' @('Options & Mgmt packs in use', 'Options & Mgmt Packs in Use', 'OptionsAndMgmtPacksInUse', 'Options and Mgmt packs in use')
 }
