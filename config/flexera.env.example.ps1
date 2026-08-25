@@ -1,44 +1,42 @@
-# Modèle des variables d'environnement nécessaires aux scripts
-# scripts/Invoke-OracleLicenseControl.ps1 et scripts/Export-OracleLicenseUsage.ps1.
+# Modèle des variables d'environnement des scripts Flexera.
 #
 # Utilisation :
-#   1. Copier ce fichier vers config/flexera.env.ps1 (ignoré par git, ne
-#      jamais committer de secret).
-#   2. Renseigner les valeurs ci-dessous pour votre zone Flexera (EU ou US).
-#   3. Charger les variables dans la session avant d'exécuter le script :
+#   1. Copier ce fichier vers config/flexera.env.ps1 (ignoré par git).
+#   2. Ne jamais committer un vrai secret / refresh token.
+#   3. Charger les variables avant l'exécution :
 #        . .\config\flexera.env.ps1
-#        .\scripts\Invoke-OracleLicenseControl.ps1
 
-# --- Compte de service Flexera (obligatoire) ---
-# Fournis par l'administrateur Flexera, avec accès en lecture seule.
+# --- Authentification utilisateur (recommandée pour un compte personnel) ---
+# Créer le token dans Flexera One > API Credentials.
+# Si cette variable est définie, elle est prioritaire sur client_id/client_secret.
+$env:FLEXERA_REFRESH_TOKEN = ''
+
+# --- Authentification service account (alternative) ---
+# Utilisée uniquement si FLEXERA_REFRESH_TOKEN est vide/non défini.
 $env:FLEXERA_CLIENT_ID     = ''
 $env:FLEXERA_CLIENT_SECRET = ''
 
-# --- Endpoint ITAM des positions de licences (obligatoire) ---
-# Doit exposer, directement ou via une vue publiée : nom de licence,
-# métrique, droits acquis et consommation. Remplacer {orgId} et
-# {licenseId} par les identifiants de votre tenant.
+# --- Zone Flexera ---
+# Valeurs : EU, NAM, APAC. Get-FlexeraOracleInventory.ps1 utilise EU par défaut.
+$env:FLEXERA_ZONE = 'EU'
+
+# URL API utilisée par les scripts basés sur FlexeraApiClient.psm1.
+$env:FLEXERA_API_BASE_URL = 'https://api.flexera.eu'
+
+# Organization ID Flexera One.
+$env:FLEXERA_ORG_ID = ''
+
+# --- Endpoint de positions de licences ---
+# Utilisé par Invoke-OracleLicenseControl.ps1 lorsqu'un endpoint/vues de
+# positions de licences est disponible dans le tenant.
 $env:FLEXERA_LICENSE_API_URL = ''
 
-# --- Zone du tenant : décommenter UN SEUL des deux blocs ci-dessous ---
-# Le portail où vous vous connectez (app.flexera.eu vs app.flexera.com)
-# indique la zone de votre tenant.
+# --- Override OAuth optionnel ---
+# Normalement inutile avec Get-FlexeraOracleInventory.ps1 : la zone sélectionne
+# automatiquement login.flexera.com / .eu / .au.
+# Pour les autres scripts, définir cette valeur si nécessaire.
+# $env:FLEXERA_TOKEN_URL = 'https://login.flexera.eu/oidc/token'
 
-# Zone Europe (EU)
-# $env:FLEXERA_TOKEN_URL       = 'https://login.flexera.eu/oidc/token'
-# $env:FLEXERA_LICENSE_API_URL = 'https://api.flexera.eu/fnms/v1/orgs/{orgId}/licenses/{licenseId}/consumption'
-
-# Zone Amérique du Nord (US) — valeur par défaut du script si FLEXERA_TOKEN_URL
-# est omis, à définir explicitement ici par cohérence avec le bloc EU.
-# $env:FLEXERA_TOKEN_URL       = 'https://login.flexera.com/oidc/token'
-# $env:FLEXERA_LICENSE_API_URL = 'https://api.flexera.com/fnms/v1/orgs/{orgId}/licenses/{licenseId}/consumption'
-
-# --- Optionnel : uniquement si l'administrateur Flexera les impose ---
+# --- Optionnel : seulement pour certains service accounts ---
 # $env:FLEXERA_AUDIENCE = ''
 # $env:FLEXERA_SCOPE    = ''
-
-# --- Requis uniquement pour scripts/Export-OracleLicenseUsage.ps1 ---
-# (suivi de l'usage par base/instance, voir README « Suivi de l'usage
-# par base et alerte de supervision »).
-# $env:FLEXERA_API_BASE_URL = 'https://api.flexera.eu'   # api.flexera.com en zone US
-# $env:FLEXERA_ORG_ID       = ''
