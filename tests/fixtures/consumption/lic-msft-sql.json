@@ -1,0 +1,8 @@
+[
+  {
+    "device": { "name": "winsvr01" },
+    "instances": [
+      { "name": "winsvr01~MSSQL" }
+    ]
+  }
+]

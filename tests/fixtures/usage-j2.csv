@@ -1,0 +1,4 @@
+Licence,LicenseId,Type,Instance,Machine,DateExtraction
+Oracle Database Enterprise Edition,1,Appliance,thsm01d~CDB_ROOT,thsm01d,2026-08-15T00:00:00
+Oracle Database Enterprise Edition,1,Appliance,prod02~PDB1,prod02,2026-08-15T00:00:00
+Oracle Database Enterprise Edition,1,Appliance,prod03~PDB3,prod03,2026-08-15T00:00:00

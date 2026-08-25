@@ -1,0 +1,4 @@
+Instance,ConnectString,Username,PasswordEnvVar
+thsm01d~CDB_ROOT,thsm01d.exemple.local:1521/CDBROOT,,
+prod02~PDB1,prod02.exemple.local:1521/PDB1,,
+test01~PDB2,test01.exemple.local:1521/PDB2,sam_audit_test,ORACLE_AUDIT_PASSWORD_TEST

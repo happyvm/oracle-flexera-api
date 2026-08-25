@@ -1,0 +1,11 @@
+[
+  {
+    "device": { "name": "prod02" },
+    "instances": [
+      { "name": "prod02~PDB1" }
+    ]
+  },
+  {
+    "device": { "name": "batch01" }
+  }
+]

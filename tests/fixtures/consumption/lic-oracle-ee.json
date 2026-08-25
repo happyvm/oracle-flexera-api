@@ -1,0 +1,22 @@
+[
+  {
+    "device": { "name": "thsm01d" },
+    "instances": [
+      { "name": "thsm01d~CDB_ROOT" },
+      { "name": "thsm01d~CDB_ROOT" }
+    ],
+    "products": [
+      { "name": "Oracle Database Enterprise Edition", "isSupplementary": false },
+      { "name": "Oracle Partitioning", "isSupplementary": true }
+    ]
+  },
+  {
+    "device": { "name": "prod02" },
+    "instances": [
+      { "name": "prod02~PDB1" }
+    ],
+    "products": [
+      { "name": "Oracle Database Enterprise Edition", "isSupplementary": false }
+    ]
+  }
+]
