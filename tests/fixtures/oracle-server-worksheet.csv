@@ -1,3 +1,3 @@
-Physical server name,Virtual server name,Instance name,Product version,Product edition,Environment usage,License metric,Number of licenses in use,Options & Mgmt packs in use
+Physical server name,Virtual server name,DB instance name,Product version,Product edition,Environment usage,License metric (NUP/Processor),Number of licenses in use,Options & Mgmt packs in use
 esx01,ora-vm01,PROD1,19c,Enterprise Edition,Production,Processor,4,"Partitioning; Diagnostics Pack, Tuning Pack"
 esx02,ora-vm02,DEV1,12c,Enterprise Edition,Development,NUP,25,
