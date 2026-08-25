@@ -25,12 +25,37 @@ Le script cherche automatiquement le rapport par son nom. `-ReportId` permet de 
 
 ## Authentification
 
-Deux variables sont obligatoires :
+Flexera One supporte deux modes, tous les deux transformés en `access_token` Bearer avant l'appel ITAM.
+
+### Compte utilisateur : API Refresh Token
+
+Pour un compte utilisateur, créer un **API Refresh Token** dans Flexera One > **API Credentials**, puis définir :
+
+```powershell
+$env:FLEXERA_REFRESH_TOKEN = '...'
+```
+
+Le script envoie alors :
+
+```text
+grant_type=refresh_token
+refresh_token=<token>
+```
+
+vers l'endpoint OAuth de la zone. Si `FLEXERA_REFRESH_TOKEN` est défini, ce mode est **prioritaire** sur les identifiants de service account.
+
+### Service account
+
+Alternative pour une automatisation technique :
 
 ```powershell
 $env:FLEXERA_CLIENT_ID = '...'
 $env:FLEXERA_CLIENT_SECRET = '...'
 ```
+
+Le script utilise alors `grant_type=client_credentials`.
+
+### Zone
 
 La zone sélectionne automatiquement les bons domaines API et OAuth :
 
@@ -41,16 +66,29 @@ $env:FLEXERA_ZONE = 'EU'
 # Autres valeurs possibles : NAM, APAC
 ```
 
+Correspondance :
+
+| Zone | API | OAuth |
+| --- | --- | --- |
+| `NAM` | `https://api.flexera.com` | `https://login.flexera.com/oidc/token` |
+| `EU` | `https://api.flexera.eu` | `https://login.flexera.eu/oidc/token` |
+| `APAC` | `https://api.flexera.au` | `https://login.flexera.au/oidc/token` |
+
 Une URL de token personnalisée peut toujours être imposée avec `FLEXERA_TOKEN_URL`.
+
+> Ne jamais stocker le vrai refresh token dans Git. Utiliser `config/flexera.env.ps1` (ignoré par `.gitignore`) ou un gestionnaire de secrets.
 
 ## Exécution
 
-Exemple EU :
+Avec un compte utilisateur EU :
 
 ```powershell
+$env:FLEXERA_REFRESH_TOKEN = '...'
+
 .\scripts\Get-FlexeraOracleInventory.ps1 `
   -OrganizationId '12345' `
   -Zone EU `
+  -OnlyOptions `
   -OutputCsv .\reports\oracle-options.csv
 ```
 
