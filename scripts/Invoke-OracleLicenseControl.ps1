@@ -40,20 +40,42 @@ function Get-RequiredEnvironmentVariable {
 }
 
 function Get-FlexeraAccessToken {
-    $body = @{
-        grant_type    = 'client_credentials'
-        client_id     = Get-RequiredEnvironmentVariable 'FLEXERA_CLIENT_ID'
-        client_secret = Get-RequiredEnvironmentVariable 'FLEXERA_CLIENT_SECRET'
-    }
-    if ($env:FLEXERA_AUDIENCE) { $body.audience = $env:FLEXERA_AUDIENCE }
-    if ($env:FLEXERA_SCOPE) { $body.scope = $env:FLEXERA_SCOPE }
+    param([Parameter(Mandatory)][uri] $TargetApiUri)
 
-    $tokenUrl = if ($env:FLEXERA_TOKEN_URL) { $env:FLEXERA_TOKEN_URL } else { 'https://login.flexera.com/oidc/token' }
+    if (-not [string]::IsNullOrWhiteSpace([string] $env:FLEXERA_REFRESH_TOKEN)) {
+        $body = @{
+            grant_type    = 'refresh_token'
+            refresh_token = [string] $env:FLEXERA_REFRESH_TOKEN
+        }
+    }
+    else {
+        $body = @{
+            grant_type    = 'client_credentials'
+            client_id     = Get-RequiredEnvironmentVariable 'FLEXERA_CLIENT_ID'
+            client_secret = Get-RequiredEnvironmentVariable 'FLEXERA_CLIENT_SECRET'
+        }
+        if ($env:FLEXERA_AUDIENCE) { $body.audience = $env:FLEXERA_AUDIENCE }
+        if ($env:FLEXERA_SCOPE) { $body.scope = $env:FLEXERA_SCOPE }
+    }
+
+    $tokenUrl = if ($env:FLEXERA_TOKEN_URL) {
+        [string] $env:FLEXERA_TOKEN_URL
+    }
+    elseif ($TargetApiUri.Host -match '\.flexera\.eu$') {
+        'https://login.flexera.eu/oidc/token'
+    }
+    elseif ($TargetApiUri.Host -match '\.flexera\.au$') {
+        'https://login.flexera.au/oidc/token'
+    }
+    else {
+        'https://login.flexera.com/oidc/token'
+    }
+
     $response = Invoke-RestMethod -Method Post `
         -Uri $tokenUrl `
         -ContentType 'application/x-www-form-urlencoded' `
         -Body $body
-    if ([string]::IsNullOrWhiteSpace($response.access_token)) {
+    if ([string]::IsNullOrWhiteSpace([string] $response.access_token)) {
         throw 'La réponse OAuth Flexera ne contient pas de jeton access_token.'
     }
     return [string] $response.access_token
@@ -108,7 +130,7 @@ function Resolve-SourceColumn {
 function Get-FlexeraApiRows {
     param([Parameter(Mandatory)][uri] $Uri)
 
-    $token = Get-FlexeraAccessToken
+    $token = Get-FlexeraAccessToken -TargetApiUri $Uri
     $headers = @{ Authorization = "Bearer $token"; Accept = 'application/json' }
     $origin = $Uri.Host
     $nextUri = $Uri.AbsoluteUri
@@ -213,8 +235,6 @@ $normalizedRows = @(for ($index = 0; $index -lt $sourceRows.Count; $index++) {
     }
 })
 
-# Un export peut contenir plusieurs lignes pour une même licence (par exemple
-# plusieurs pools). Le contrôle se fait sur le total par licence et métrique.
 $results = @($normalizedRows | Group-Object Licence, Metrique | ForEach-Object {
     $rights = ($_.Group | Measure-Object DroitsAcquis -Sum).Sum
     $consumption = ($_.Group | Measure-Object Consommation -Sum).Sum
