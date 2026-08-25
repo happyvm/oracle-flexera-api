@@ -75,13 +75,24 @@ function Get-RequiredEnvironmentVariable {
 function Get-FlexeraAccessToken {
     param([Parameter(Mandatory)][string] $DefaultLoginBaseUri)
 
-    $body = @{
-        grant_type    = 'client_credentials'
-        client_id     = Get-RequiredEnvironmentVariable 'FLEXERA_CLIENT_ID'
-        client_secret = Get-RequiredEnvironmentVariable 'FLEXERA_CLIENT_SECRET'
+    # Un API Refresh Token créé dans Flexera One > API Credentials est le mode
+    # utilisateur officiel. Il est prioritaire lorsqu'il est défini. Le mode
+    # service account reste disponible pour les automatisations techniques.
+    if (-not [string]::IsNullOrWhiteSpace([string] $env:FLEXERA_REFRESH_TOKEN)) {
+        $body = @{
+            grant_type    = 'refresh_token'
+            refresh_token = [string] $env:FLEXERA_REFRESH_TOKEN
+        }
     }
-    if ($env:FLEXERA_AUDIENCE) { $body.audience = $env:FLEXERA_AUDIENCE }
-    if ($env:FLEXERA_SCOPE) { $body.scope = $env:FLEXERA_SCOPE }
+    else {
+        $body = @{
+            grant_type    = 'client_credentials'
+            client_id     = Get-RequiredEnvironmentVariable 'FLEXERA_CLIENT_ID'
+            client_secret = Get-RequiredEnvironmentVariable 'FLEXERA_CLIENT_SECRET'
+        }
+        if ($env:FLEXERA_AUDIENCE) { $body.audience = $env:FLEXERA_AUDIENCE }
+        if ($env:FLEXERA_SCOPE) { $body.scope = $env:FLEXERA_SCOPE }
+    }
 
     $tokenUrl = if ($env:FLEXERA_TOKEN_URL) {
         $env:FLEXERA_TOKEN_URL
