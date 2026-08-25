@@ -1,1 +1,0 @@
-FLEXERA_REFRESH_TOKEN is preferred when present; service-account credentials remain the fallback.
