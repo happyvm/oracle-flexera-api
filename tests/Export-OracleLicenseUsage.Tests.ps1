@@ -23,15 +23,25 @@ Describe 'Export-OracleLicenseUsage' {
         $rows | Where-Object Licence -like 'Microsoft*' | Should -BeNullOrEmpty
     }
 
-    It 'liste une instance par couple licence/base, dédupliquée' {
+    It 'liste une ligne par couple licence/instance/option, dédupliquée' {
         $ee = $rows | Where-Object Licence -eq 'Oracle Database Enterprise Edition'
-        $ee.Count | Should -Be 2
-        ($ee | Where-Object Instance -eq 'thsm01d~CDB_ROOT').Count | Should -Be 1
+        $ee.Count | Should -Be 3
+        ($ee | Where-Object { $_.Instance -eq 'thsm01d~CDB_ROOT' -and $_.Option -eq 'Oracle Database Enterprise Edition' }).Count | Should -Be 1
     }
 
-    It 'ignore les consommations sans instance associée' {
+    It 'distingue une option supplémentaire du produit de base' {
+        $partitioning = $rows | Where-Object Option -eq 'Oracle Partitioning'
+        $partitioning.Instance | Should -Be 'thsm01d~CDB_ROOT'
+        $partitioning.EstOptionSupplementaire | Should -Be 'Oui'
+
+        $base = $rows | Where-Object { $_.Instance -eq 'thsm01d~CDB_ROOT' -and $_.Option -eq 'Oracle Database Enterprise Edition' }
+        $base.EstOptionSupplementaire | Should -Be 'Non'
+    }
+
+    It 'ignore les consommations sans instance associée, sans option connue' {
         $diag = $rows | Where-Object Licence -eq 'Oracle Diagnostics Pack'
         $diag.Count | Should -Be 1
         $diag.Instance | Should -Be 'prod02~PDB1'
+        $diag.Option | Should -BeNullOrEmpty
     }
 }

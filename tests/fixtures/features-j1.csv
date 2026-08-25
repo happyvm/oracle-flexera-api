@@ -1,0 +1,2 @@
+Instance,Fonctionnalite,Version,UsagesDetectes,ActuellementUtilise,PremiereUtilisation,DerniereUtilisation,DateExtraction
+thsm01d~CDB_ROOT,Partitioning (user),19.0.0.0.0,42,Oui,2025-01-01T00:00:00,2026-08-01T00:00:00,2026-08-01T00:00:00

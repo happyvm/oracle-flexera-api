@@ -2,3 +2,5 @@ exports/
 reports/
 config/column-map.json
 config/flexera.env.ps1
+config/oracle-audit.env.ps1
+config/oracle-instances.csv

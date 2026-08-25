@@ -33,7 +33,7 @@ param(
 
     Ce rapport est la matière première de Compare-OracleLicenseUsage.ps1, qui
     diffuse deux extractions pour détecter les nouveaux usages ou arrêts
-    d'usage d'une licence sur une base entre deux dates.
+    d'usage d'une licence (ou d'une option) sur une base entre deux dates.
 
     Le mode -LicensesJson/-ConsumptionJsonDir permet de rejouer une capture
     hors-ligne (tests, débogage) sans appeler l'API réelle : -LicensesJson
@@ -41,6 +41,21 @@ param(
     -ConsumptionJsonDir contient un fichier "<licenseId>.json" par licence
     concernée, contenant le tableau JSON tel que retourné par
     /licenses/{licenseId}/consumption (propriété "values").
+
+    Chaque enregistrement de consommation porte un tableau "products", dont
+    chaque entrée a un indicateur "isSupplementary" : c'est le mécanisme
+    générique par lequel Flexera distingue un composant/option ajouté au
+    produit de base. Ce rapport reprend donc une ligne par couple
+    (licence, instance, produit). LIMITE IMPORTANTE : "instances" et
+    "products" sont tous deux portés au niveau de la machine sur un même
+    enregistrement, pas explicitement reliés entre eux. Si une machine
+    n'héberge qu'une seule instance, l'attribution option → base est fiable.
+    Si elle en héberge plusieurs, Flexera ne permet pas de savoir laquelle
+    des instances utilise quelle option : toutes les instances de
+    l'enregistrement se voient alors associées à tous ses produits. Pour
+    lever cette ambiguïté au niveau de l'instance, croiser avec
+    Get-OracleDatabaseFeatureUsage.ps1, qui interroge directement
+    DBA_FEATURE_USAGE_STATISTICS de chaque base.
 #>
 
 Set-StrictMode -Version Latest
@@ -87,44 +102,75 @@ foreach ($license in $matchedLicenses) {
     }
     else {
         $consumptionFile = Join-Path $ConsumptionJsonDir "$licenseId.json"
-        $consumptionRecords = if (Test-Path -LiteralPath $consumptionFile -PathType Leaf) {
-            @(Get-Content -LiteralPath $consumptionFile -Raw | ConvertFrom-Json)
-        }
-        else {
-            @()
-        }
+        # Enveloppé dans un @(...) englobant : un bloc if/else dont la
+        # branche prise n'écrit aucun objet (cas de "else { @() }") ferait
+        # sinon s'effondrer l'affectation à $null plutôt qu'à un tableau vide.
+        $consumptionRecords = @(
+            if (Test-Path -LiteralPath $consumptionFile -PathType Leaf) {
+                Get-Content -LiteralPath $consumptionFile -Raw | ConvertFrom-Json
+            }
+        )
     }
 
     # Seules les consommations rattachées à une instance (typiquement une
-    # base de données) répondent au besoin « cette licence a-t-elle été
-    # utilisée sur cette base ». Les consommations au seul niveau machine,
-    # sans instance identifiée, ne sont pas reportées ici.
-    $instanceKeys = [Collections.Generic.HashSet[string]]::new()
+    # base de données) répondent au besoin « cette licence (ou cette
+    # option) a-t-elle été utilisée sur cette base ». Les consommations au
+    # seul niveau machine, sans instance identifiée, ne sont pas reportées
+    # ici.
+    $rowKeys = [Collections.Generic.HashSet[string]]::new()
     foreach ($record in $consumptionRecords) {
         if ($record.PSObject.Properties.Name -notcontains 'instances') { continue }
         $machine = if ($record.PSObject.Properties.Name -contains 'device') { [string] $record.device.name } else { '' }
+        # Enveloppé dans un @(...) englobant pour la même raison que
+        # $consumptionRecords ci-dessus (éviter l'effondrement à $null).
+        $products = @(if ($record.PSObject.Properties.Name -contains 'products') { $record.products })
+
         foreach ($instance in @($record.instances)) {
             $instanceName = [string] $instance.name
             if ([string]::IsNullOrWhiteSpace($instanceName)) { continue }
-            $key = "$licenseId|$instanceName|$machine"
-            if (-not $instanceKeys.Add($key)) { continue }
 
-            $rows.Add([pscustomobject] [ordered] @{
-                Licence        = $licenseName
-                LicenseId      = $licenseId
-                Type           = $licenseType
-                Instance       = $instanceName
-                Machine        = $machine
-                DateExtraction = $extractedAt
-            })
+            if ($products.Count -eq 0) {
+                $key = "$licenseId|$instanceName|$machine|"
+                if (-not $rowKeys.Add($key)) { continue }
+                $rows.Add([pscustomobject] [ordered] @{
+                    Licence               = $licenseName
+                    LicenseId             = $licenseId
+                    Type                  = $licenseType
+                    Instance              = $instanceName
+                    Machine               = $machine
+                    Option                = ''
+                    EstOptionSupplementaire = ''
+                    DateExtraction        = $extractedAt
+                })
+                continue
+            }
+
+            foreach ($product in $products) {
+                $productName = [string] $product.name
+                if ([string]::IsNullOrWhiteSpace($productName)) { continue }
+                $isSupplementary = if ($product.PSObject.Properties.Name -contains 'isSupplementary') { [bool] $product.isSupplementary } else { $false }
+                $key = "$licenseId|$instanceName|$machine|$productName"
+                if (-not $rowKeys.Add($key)) { continue }
+
+                $rows.Add([pscustomobject] [ordered] @{
+                    Licence               = $licenseName
+                    LicenseId             = $licenseId
+                    Type                  = $licenseType
+                    Instance              = $instanceName
+                    Machine               = $machine
+                    Option                = $productName
+                    EstOptionSupplementaire = if ($isSupplementary) { 'Oui' } else { 'Non' }
+                    DateExtraction        = $extractedAt
+                })
+            }
         }
     }
 }
 
 $outputDirectory = Split-Path -Parent $OutputCsv
 if ($outputDirectory) { New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null }
-$rows | Sort-Object Licence, Instance |
+$rows | Sort-Object Licence, Instance, Option |
     Export-Csv -LiteralPath $OutputCsv -NoTypeInformation -Encoding UTF8 -Delimiter $Delimiter
 
-Write-Host "Export terminé : $($rows.Count) couple(s) licence/instance sur $($matchedLicenses.Count) licence(s) '$PublisherFilter'."
+Write-Host "Export terminé : $($rows.Count) ligne(s) licence/instance/option sur $($matchedLicenses.Count) licence(s) '$PublisherFilter'."
 Write-Host "Rapport : $OutputCsv"
