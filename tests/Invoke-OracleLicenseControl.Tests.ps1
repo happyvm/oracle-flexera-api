@@ -18,7 +18,7 @@ BeforeAll {
 }
 
 Describe 'Invoke-OracleLicenseControl' {
-    It 'renvoie le code 2 lorsqu’un déficit existe' {
+    It 'renvoie le code 2 lorsqu''un déficit existe' {
         $process.ExitCode | Should -Be 2
     }
 

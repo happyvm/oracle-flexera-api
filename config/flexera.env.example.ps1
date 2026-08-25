@@ -1,5 +1,5 @@
-# Modèle des variables d'environnement nécessaires au script
-# scripts/Invoke-OracleLicenseControl.ps1.
+# Modèle des variables d'environnement nécessaires aux scripts
+# scripts/Invoke-OracleLicenseControl.ps1 et scripts/Export-OracleLicenseUsage.ps1.
 #
 # Utilisation :
 #   1. Copier ce fichier vers config/flexera.env.ps1 (ignoré par git, ne
@@ -36,3 +36,9 @@ $env:FLEXERA_LICENSE_API_URL = ''
 # --- Optionnel : uniquement si l'administrateur Flexera les impose ---
 # $env:FLEXERA_AUDIENCE = ''
 # $env:FLEXERA_SCOPE    = ''
+
+# --- Requis uniquement pour scripts/Export-OracleLicenseUsage.ps1 ---
+# (suivi de l'usage par base/instance, voir README « Suivi de l'usage
+# par base et alerte de supervision »).
+# $env:FLEXERA_API_BASE_URL = 'https://api.flexera.eu'   # api.flexera.com en zone US
+# $env:FLEXERA_ORG_ID       = ''

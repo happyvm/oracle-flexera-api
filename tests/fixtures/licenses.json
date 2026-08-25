@@ -1,0 +1,20 @@
+[
+  {
+    "id": "lic-oracle-ee",
+    "name": "Oracle Database Enterprise Edition",
+    "type": "Appliance",
+    "company": { "name": "Oracle" }
+  },
+  {
+    "id": "lic-oracle-diag",
+    "name": "Oracle Diagnostics Pack",
+    "type": "Option",
+    "company": { "name": "Oracle" }
+  },
+  {
+    "id": "lic-msft-sql",
+    "name": "Microsoft SQL Server Database Engine Services 2019",
+    "type": "Appliance",
+    "company": { "name": "Microsoft" }
+  }
+]

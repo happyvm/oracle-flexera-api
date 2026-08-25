@@ -1,0 +1,15 @@
+[
+  {
+    "device": { "name": "thsm01d" },
+    "instances": [
+      { "name": "thsm01d~CDB_ROOT" },
+      { "name": "thsm01d~CDB_ROOT" }
+    ]
+  },
+  {
+    "device": { "name": "prod02" },
+    "instances": [
+      { "name": "prod02~PDB1" }
+    ]
+  }
+]

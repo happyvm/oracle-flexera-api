@@ -259,10 +259,64 @@ tenant, planifiez l'export CSV dans Flexera et utilisez le mode de secours :
 Le séparateur du CSV est configurable avec `-Delimiter ';'`. Les valeurs
 numériques utilisent la culture choisie avec `-Culture`.
 
+## Suivi de l'usage par base et alerte de supervision
+
+Au-delà du contrôle global droits/consommation par licence, l'API FNMS v1 de
+Flexera One expose le détail des objets qui consomment réellement chaque
+licence — dont, pour les licences de bases de données, les **instances**
+(bases) concernées. C'est confirmé directement dans le schéma OpenAPI publié
+par Flexera (`https://developer.flexera.com/openapi/services/fnms/v1/openapi.json`) :
+
+| Endpoint | Rôle |
+| --- | --- |
+| `GET /fnms/v1/orgs/{orgId}/licenses` | Liste des licences avec droits/consommation agrégés (`compliance.purchasedEntitlementCount`, `compliance.consumedEntitlementCount`). |
+| `GET /fnms/v1/orgs/{orgId}/licenses/{licenseId}/consumption` | Détail par machine, avec un tableau `instances[].name` — pour Oracle, le nom d'instance/PDB (ex. `thsm01d~CDB_ROOT`). |
+
+Deux scripts exploitent ce détail pour répondre à la question « telle licence
+a-t-elle été utilisée sur telle base, et est-ce nouveau depuis la dernière
+extraction ? » :
+
+**1. Extraction d'une photo à un instant T :**
+
+```powershell
+$env:FLEXERA_API_BASE_URL = 'https://api.flexera.eu'   # ou api.flexera.com en zone US
+$env:FLEXERA_ORG_ID = '12345'
+
+.\scripts\Export-OracleLicenseUsage.ps1 -OutputCsv .\reports\usage-instances-J1.csv
+```
+
+Produit un CSV `Licence, LicenseId, Type, Instance, Machine, DateExtraction` :
+une ligne par couple licence/instance effectivement observé. `-PublisherFilter`
+(`Oracle` par défaut) restreint aux licences dont l'éditeur ou le nom
+contiennent ce mot ; seules les consommations rattachées à une instance sont
+retenues, les consommations au seul niveau machine sont ignorées.
+
+**2. Comparaison entre deux extractions :**
+
+```powershell
+.\scripts\Compare-OracleLicenseUsage.ps1 `
+  -BeforeCsv .\reports\usage-instances-J1.csv `
+  -AfterCsv  .\reports\usage-instances-J2.csv `
+  -OutputCsv .\reports\diff-usage-instances.csv
+```
+
+Classe chaque couple licence/instance en `NouvelUsage` (absent en J1, présent
+en J2 — une base a commencé à consommer la licence), `UsageArrete` (inverse)
+ou `Inchange`. Le script renvoie le code processus **2** si au moins un
+`NouvelUsage` est détecté, **0** sinon — même convention que
+`Invoke-OracleLicenseControl.ps1`, directement exploitable par un
+ordonnanceur ou un check actif Nagios/Centreon. Ce script ne pousse rien vers
+Centreon lui-même : câbler l'envoi (check actif, ou passif via NSCA/NRDP)
+reste à faire selon votre infrastructure de supervision.
+
+`scripts/FlexeraApiClient.psm1` factorise l'authentification OAuth et la
+pagination FNMS v1 (suivi du champ `nextPage`) utilisées par
+`Export-OracleLicenseUsage.ps1`.
+
 ## Tests
 
 Les tests d'intégration nécessitent PowerShell et Pester 5 :
 
 ```powershell
-Invoke-Pester .\tests\Invoke-OracleLicenseControl.Tests.ps1 -Output Detailed
+Invoke-Pester .\tests -Output Detailed
 ```
