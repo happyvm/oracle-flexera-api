@@ -59,4 +59,40 @@ Describe 'Get-FlexeraOracleInventory' {
         $onlyOptionsRows.Count | Should -Be 3
         @($onlyOptionsRows | Where-Object InstanceName -eq 'DEV1').Count | Should -Be 0
     }
+
+    It 'charge un fichier de configuration et utilise le répertoire de sortie configuré' {
+        $configuredOutputDir = Join-Path $TestDrive 'configured-reports'
+        $configPath = Join-Path $TestDrive 'flexera.env.ps1'
+        Set-Content -LiteralPath $configPath -Encoding UTF8 -Value "`$env:FLEXERA_REPORT_DIR = '$configuredOutputDir'"
+
+        $arguments = @(
+            '-NoProfile', '-File', $scriptPath,
+            '-ReportCsv', (Join-Path $fixturePath 'oracle-server-worksheet.csv'),
+            '-ConfigFile', $configPath
+        )
+        $configuredProcess = Start-Process -FilePath $shell -ArgumentList $arguments -Wait -PassThru
+        $generated = @(Get-ChildItem -LiteralPath $configuredOutputDir -Filter 'oracle-options-*.csv' -File)
+
+        $configuredProcess.ExitCode | Should -Be 0
+        $generated.Count | Should -Be 1
+    }
+
+    It 'donne priorité à la ligne de commande sur le fichier de configuration' {
+        $configuredOutputDir = Join-Path $TestDrive 'should-not-be-used'
+        $explicitOutputPath = Join-Path $TestDrive 'explicit-output.csv'
+        $configPath = Join-Path $TestDrive 'override.env.ps1'
+        Set-Content -LiteralPath $configPath -Encoding UTF8 -Value "`$env:FLEXERA_REPORT_DIR = '$configuredOutputDir'"
+
+        $arguments = @(
+            '-NoProfile', '-File', $scriptPath,
+            '-ReportCsv', (Join-Path $fixturePath 'oracle-server-worksheet.csv'),
+            '-ConfigFile', $configPath,
+            '-OutputCsv', $explicitOutputPath
+        )
+        $overrideProcess = Start-Process -FilePath $shell -ArgumentList $arguments -Wait -PassThru
+
+        $overrideProcess.ExitCode | Should -Be 0
+        Test-Path -LiteralPath $explicitOutputPath | Should -BeTrue
+        Test-Path -LiteralPath $configuredOutputDir | Should -BeFalse
+    }
 }
