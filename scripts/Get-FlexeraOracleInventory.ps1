@@ -491,15 +491,15 @@ if ($sourceRows.Count -eq 0) { throw 'Le rapport Oracle Flexera ne contient aucu
 
 $sample = $sourceRows[0]
 $columns = [pscustomobject]@{
-    PhysicalServer = Resolve-SourceColumn $sample 'Physical server name' @('Physical server name', 'PhysicalServerName', 'Physical Server', 'Host server name') -Optional
+    PhysicalServer = Resolve-SourceColumn $sample 'Physical server name' @('Physical server name', 'PhysicalServerName', 'Physical Server', 'Host server name', 'ServerName') -Optional
     VirtualServer  = Resolve-SourceColumn $sample 'Virtual server name' @('Virtual server name', 'VirtualServerName', 'Virtual Server', 'Device name') -Optional
     Instance       = Resolve-SourceColumn $sample 'DB instance name' @('DB instance name', 'Instance name', 'InstanceName', 'Oracle instance', 'OracleInstanceName')
-    Version        = Resolve-SourceColumn $sample 'Product version' @('Product version', 'ProductVersion', 'Version') -Optional
-    Edition        = Resolve-SourceColumn $sample 'Product edition' @('Product edition', 'ProductEdition', 'Edition') -Optional
-    Environment    = Resolve-SourceColumn $sample 'Environment usage' @('Environment usage', 'EnvironmentUsage', 'Environment') -Optional
+    Version        = Resolve-SourceColumn $sample 'Product version' @('Product version', 'ProductVersion', 'Version', 'InstanceVersion', 'SoftwareTitleVersion') -Optional
+    Edition        = Resolve-SourceColumn $sample 'Product edition' @('Product edition', 'ProductEdition', 'Edition', 'DBEdition') -Optional
+    Environment    = Resolve-SourceColumn $sample 'Environment usage' @('Environment usage', 'EnvironmentUsage', 'Environment', 'LicenseMetricAppliedEnvironment') -Optional
     Metric         = Resolve-SourceColumn $sample 'License metric (NUP/Processor)' @('License metric (NUP/Processor)', 'License metric', 'LicenseMetric', 'Metric') -Optional
-    Consumption    = Resolve-SourceColumn $sample 'Number of licenses in use' @('Number of licenses in use', 'NumberOfLicensesInUse', 'Licenses in use', 'Consumption') -Optional
-    Options        = Resolve-SourceColumn $sample 'Options & Mgmt packs in use' @('Options & Mgmt packs in use', 'Options & Mgmt Packs in Use', 'OptionsAndMgmtPacksInUse', 'Options and Mgmt packs in use')
+    Consumption    = Resolve-SourceColumn $sample 'Number of licenses in use' @('Number of licenses in use', 'NumberOfLicensesInUse', 'Licenses in use', 'Consumption', 'LicenseUsage') -Optional
+    Options        = Resolve-SourceColumn $sample 'Options & Mgmt packs in use' @('Options & Mgmt packs in use', 'Options & Mgmt Packs in Use', 'OptionsAndMgmtPacksInUse', 'Options and Mgmt packs in use', 'OptionMgmtPacks')
 }
 
 Write-Verbose "Mapping détecté : $($columns | ConvertTo-Json -Compress)"
