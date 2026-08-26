@@ -54,7 +54,7 @@ Pour ne sortir que les options/packs effectivement listés par Flexera :
 Les paramètres passés en ligne de commande ont toujours priorité sur le fichier de configuration. Exemple :
 
 ```powershell
-.\scripts\Get-FlexeraOracleInventory.ps1 -PageSize 2000 -OnlyOptions
+.\scripts\Get-FlexeraOracleInventory.ps1 -PageSize 5000 -OnlyOptions
 ```
 
 Un fichier de configuration différent peut être utilisé ponctuellement :
@@ -81,7 +81,7 @@ $env:FLEXERA_CONFIG_FILE = 'C:\secure\flexera.env.ps1'
 | `FLEXERA_TOKEN_URL` | Override de l'endpoint OAuth. |
 | `FLEXERA_ORACLE_REPORT_NAME` | Nom du rapport à découvrir. |
 | `FLEXERA_ORACLE_REPORT_ID` | ID du rapport, facultatif. |
-| `FLEXERA_ORACLE_PAGE_SIZE` | Taille des pages synchrones. |
+| `FLEXERA_ORACLE_PAGE_SIZE` | Taille des pages synchrones (minimum 5000, exigé par l'API). |
 | `FLEXERA_ORACLE_POLL_TIMEOUT_SECONDS` | Timeout du mode asynchrone. |
 | `FLEXERA_ORACLE_POLL_INTERVAL_SECONDS` | Intervalle de polling asynchrone. |
 | `FLEXERA_ORACLE_SEARCH_TEXT` | Filtre `searchText`, facultatif. |

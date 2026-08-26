@@ -53,8 +53,8 @@ $env:FLEXERA_ORACLE_REPORT_NAME = 'Oracle Server Worksheet for Oracle Database'
 # Facultatif : renseigner l'ID pour éviter la découverte par nom.
 $env:FLEXERA_ORACLE_REPORT_ID = ''
 
-# Pagination et polling.
-$env:FLEXERA_ORACLE_PAGE_SIZE = '1000'
+# Pagination et polling. L'API exige un minimum de 5000.
+$env:FLEXERA_ORACLE_PAGE_SIZE = '5000'
 $env:FLEXERA_ORACLE_POLL_TIMEOUT_SECONDS = '600'
 $env:FLEXERA_ORACLE_POLL_INTERVAL_SECONDS = '5'
 

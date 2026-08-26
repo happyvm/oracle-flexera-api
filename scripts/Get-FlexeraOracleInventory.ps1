@@ -20,8 +20,8 @@ param(
     [switch] $Async,
 
     [Parameter(ParameterSetName = 'Api')]
-    [ValidateRange(1, 10000)]
-    [int] $PageSize = 1000,
+    [ValidateRange(5000, 10000)]
+    [int] $PageSize = 5000,
 
     [Parameter(ParameterSetName = 'Api')]
     [string] $SearchText,
@@ -117,7 +117,7 @@ if (-not $PSBoundParameters.ContainsKey('ReportName') -and $env:FLEXERA_ORACLE_R
     $ReportName = [string] $env:FLEXERA_ORACLE_REPORT_NAME
 }
 if (-not $PSBoundParameters.ContainsKey('PageSize')) {
-    $PageSize = Get-EnvironmentInt -Name 'FLEXERA_ORACLE_PAGE_SIZE' -CurrentValue $PageSize -Minimum 1 -Maximum 10000
+    $PageSize = Get-EnvironmentInt -Name 'FLEXERA_ORACLE_PAGE_SIZE' -CurrentValue $PageSize -Minimum 5000 -Maximum 10000
 }
 if (-not $PSBoundParameters.ContainsKey('PollTimeoutSeconds')) {
     $PollTimeoutSeconds = Get-EnvironmentInt -Name 'FLEXERA_ORACLE_POLL_TIMEOUT_SECONDS' -CurrentValue $PollTimeoutSeconds -Minimum 1 -Maximum 3600
